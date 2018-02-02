@@ -63,23 +63,28 @@ glm::dvec3 PointLight::shadowAttenuation(const ray& r, const glm::dvec3& p) cons
 
 	// hits an object
 	if(scene->intersect(_r, i_in) && i_in.getT() < dist) {
-		_r.setPosition(_r.at(i_in.getT() + 0.00001));
-		isect i_out;
-		// looks for the point where the raw exits the current object
-		if(scene->intersect(_r, i_out)) {
-			//calculate attenuation
-			double travel_dist = i_out.getT();
-			glm::dvec3 trans = i_in.getMaterial().kt(i_in);
-			glm::dvec3 atten(std::pow(trans[0],travel_dist),
-					 std::pow(trans[1],travel_dist),
-					 std::pow(trans[2],travel_dist));
-				
-			// now look for more attenuation from other objects between here and the light
+		if(i_in.getMaterial().Trans()) {
 			_r.setPosition(_r.at(i_in.getT() + 0.00001));
-			atten *= this->shadowAttenuation(_r, _r.getPosition()); //
-			return atten;		
+			isect i_out;
+			// looks for the point where the raw exits the current object
+			if(scene->intersect(_r, i_out)) {
+				//calculate attenuation
+				double travel_dist = i_out.getT();
+				glm::dvec3 trans = i_in.getMaterial().kt(i_in);
+				glm::dvec3 atten(std::pow(trans[0],travel_dist),
+						 std::pow(trans[1],travel_dist),
+						 std::pow(trans[2],travel_dist));
+				
+				// now look for more attenuation from other objects between here and the light
+				_r.setPosition(_r.at(i_in.getT() + 0.00001));
+				atten *= this->shadowAttenuation(_r, _r.getPosition()); //
+				return atten;		
+			} else {
+				// if we never exit the object, assume light is inside the obj
+				return glm::dvec3(0.0,0.0,0.0);
+			}
 		} else {
-			// if we never exit the object, assume light is inside the obj
+			// opaque shadow is complete 0 contribution
 			return glm::dvec3(0.0,0.0,0.0);
 		}
 	}	

@@ -71,6 +71,8 @@ glm::dvec3 RayTracer::tracePixel(int i, int j)
 // (or places called from here) to handle reflection, refraction, etc etc.
 glm::dvec3 RayTracer::traceRay(ray& r, const glm::dvec3& thresh, int depth, double& t )
 {
+	if (depth < 0) 
+		return glm::dvec3(0.0,0.0,0.0);
 	isect i;
 	glm::dvec3 colorC;
 #if VERBOSE
@@ -78,23 +80,33 @@ glm::dvec3 RayTracer::traceRay(ray& r, const glm::dvec3& thresh, int depth, doub
 #endif
 
 	if(scene->intersect(r, i)) {
+		double t2 = t = i.getT();
 		const Material& m = i.getMaterial();
 		// color of the object (before any reflections)
-		glm::dvec3 objColor = m.shade(scene.get(), r, i);
+		glm::dvec3 mat = m.shade(scene.get(), r, i);
+		glm::dvec3 emis = m.ke(i);
+		glm::dvec3 refl(0.0,0.0,0.0);
+		glm::dvec3 trans(0.0,0.0,0.0);
 
-		// An intersection occurred!  We've got work to do.  For now,
-		// this code gets the material for the surface that was intersected,
-		// and asks that material to provide a color for the ray.
+		// reflection
+		if(m.Refl()) {
+			glm::dvec3 in_dir = r.getDirection();
+			glm::dvec3 n = i.getN();
+			glm::dvec3 proj = n * glm::dot(in_dir,n);
+			glm::dvec3 refl_dir = in_dir - 2.0 * proj;
+			refl_dir = glm::normalize(refl_dir);
+			glm::dvec3 P_nudge = r.at(i.getT() - 0.00001);
+			
+			ray reflRay(P_nudge,refl_dir,glm::dvec3(0.0,0.0,0.0),ray::REFLECTION);
+			refl = this->traceRay(reflRay, thresh, depth - 1, t2);
+			refl *= m.kr(i);
+		}
+		// refraction
+		if(m.Trans()) {
+			
+		}
 
-		// This is a great place to insert code for recursive ray tracing.
-		// Instead of just returning the result of shade(), add some
-		// more steps: add in the contributions from reflected and refracted
-		// rays.
-
-		// REFLECTION!!!
-		//ray ref();
-
-		colorC = objColor;
+		colorC = mat + emis + refl + trans;
 	} else {
 		// No intersection.  This ray travels to infinity, so we color
 		// it according to the background color, which in this (simple) case
@@ -199,14 +211,14 @@ void RayTracer::traceSetup(int w, int h)
 	thresh = traceUI->getThreshold();
 	samples = traceUI->getSuperSamples();
 	aaThresh = traceUI->getAaThreshold();
-	
+
+	//std::cout << thresh << "\n";	
+
 	if(!threads) threads = 1;
 
 	for(int i = 0; i < threads; ++i) {	
 		threadStatus.push_back(false);
 	}
-	// YOUR CODE HERE
-	// FIXME: Additional initializations
 }
 
 /*
